@@ -9,6 +9,10 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+/**
+ * Root layout component for the application.
+ * Provides theme and navigation context.
+ */
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 

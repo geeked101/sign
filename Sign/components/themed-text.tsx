@@ -2,12 +2,16 @@ import { StyleSheet, Text, type TextProps } from 'react-native';
 
 import { useThemeColor } from '@/hooks/use-theme-color';
 
-export type ThemedTextProps = TextProps & {
+export interface ThemedTextProps extends TextProps {
   lightColor?: string;
   darkColor?: string;
   type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link';
-};
+}
 
+/**
+ * A Text component that automatically uses the theme's text color.
+ * Supports multiple predefined text styles.
+ */
 export function ThemedText({
   style,
   lightColor,

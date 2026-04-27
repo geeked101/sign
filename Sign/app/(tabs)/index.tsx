@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, SafeAreaView, ScrollView, Image
+  StyleSheet, SafeAreaView, ScrollView
 } from 'react-native';
+import { Image } from 'expo-image';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
 
-const SIGNS: Record<string, any> = {
+type SignSource = string | number;
+
+const SIGNS: Record<string, SignSource> = {
   'hello': require('../../assets/signs/hello.gif'),
   'thank': 'https://www.handspeak.com/word/t/tha/thank-you.gif',
   'you': 'https://www.handspeak.com/word/y/you/you.gif',
@@ -28,51 +31,95 @@ export default function App() {
   const [words, setWords] = useState<string[]>([]);
   const [wordIndex, setWordIndex] = useState(0);
 
+  /**
+   * Request necessary permissions for speech recognition on component mount.
+   */
   useEffect(() => {
-    ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    const getPermissions = async () => {
+      try {
+        await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      } catch (error) {
+        console.error('Failed to request speech recognition permissions:', error);
+      }
+    };
+    getPermissions();
   }, []);
 
   useSpeechRecognitionEvent('result', (event) => {
     const text = event.results[0]?.transcript || '';
+    console.log('Transcript received:', text);
     setTranscript(text);
     const split = text.toLowerCase().trim().split(' ').filter(Boolean);
     setWords(split);
     setWordIndex(0);
-    if (split.length > 0) setCurrentWord(split[0]);
+    if (split.length > 0) {
+      const firstWord = split[0];
+      console.log('Current word:', firstWord);
+      console.log('Sign data:', SIGNS[firstWord]);
+      setCurrentWord(firstWord);
+    }
   });
 
   useSpeechRecognitionEvent('end', () => {
     setListening(false);
   });
 
+  /**
+   * Starts the speech recognition service.
+   * Resets transcript and word state before starting.
+   */
   const startListening = async () => {
-    setTranscript('');
-    setWords([]);
-    setCurrentWord('');
-    setWordIndex(0);
-    setListening(true);
-    await ExpoSpeechRecognitionModule.start({
-      lang: 'en-KE',
-      interimResults: true,
-      continuous: false,
-    });
+    try {
+      setTranscript('');
+      setWords([]);
+      setCurrentWord('');
+      setWordIndex(0);
+      setListening(true);
+      await ExpoSpeechRecognitionModule.start({
+        lang: 'en-KE',
+        interimResults: true,
+        continuous: false,
+      });
+    } catch (error) {
+      setListening(false);
+      console.error('Error starting speech recognition:', error);
+    }
   };
 
+  /**
+   * Stops the speech recognition service.
+   */
   const stopListening = async () => {
-    await ExpoSpeechRecognitionModule.stop();
-    setListening(false);
+    try {
+      await ExpoSpeechRecognitionModule.stop();
+      setListening(false);
+    } catch (error) {
+      console.error('Error stopping speech recognition:', error);
+    }
   };
 
+  /**
+   * Displays the previous word in the transcript.
+   */
   const showPrevWord = () => {
     const newIndex = Math.max(0, wordIndex - 1);
     setWordIndex(newIndex);
-    setCurrentWord(words[newIndex]);
+    const word = words[newIndex];
+    console.log('Navigating to prev word:', word);
+    console.log('Sign data:', SIGNS[word]);
+    setCurrentWord(word);
   };
 
+  /**
+   * Displays the next word in the transcript.
+   */
   const showNextWord = () => {
     const newIndex = Math.min(words.length - 1, wordIndex + 1);
     setWordIndex(newIndex);
-    setCurrentWord(words[newIndex]);
+    const word = words[newIndex];
+    console.log('Navigating to next word:', word);
+    console.log('Sign data:', SIGNS[word]);
+    setCurrentWord(word);
   };
 
   const currentSign = SIGNS[currentWord];
@@ -86,7 +133,7 @@ export default function App() {
         {currentSign ? (
           <>
             <Image
-              source={{ uri: currentSign }}
+              source={typeof currentSign === 'string' ? { uri: currentSign } : currentSign}
               style={styles.signImage}
               resizeMode="contain"
             />
