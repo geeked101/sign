@@ -8,6 +8,14 @@
     "scheme": "sign",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "updates": {
+      "url": "https://u.expo.dev/8cf99b47-9f99-4a20-913f-40e4d4559839",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
