@@ -8,8 +8,8 @@ import {
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
 
-const SIGNS: Record<string, string> = {
-  'hello': 'https://www.handspeak.com/word/h/hel/hello.gif',
+const SIGNS: Record<string, any> = {
+  'hello': require('../../assets/signs/hello.gif'),
   'thank': 'https://www.handspeak.com/word/t/tha/thank-you.gif',
   'you': 'https://www.handspeak.com/word/y/you/you.gif',
   'please': 'https://www.handspeak.com/word/p/ple/please.gif',
