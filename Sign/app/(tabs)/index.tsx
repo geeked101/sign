@@ -8,23 +8,42 @@ import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
+import StickFigureAvatar from '../../components/StickFigureAvatar';
+import helloSign from '../../assets/signs/hello.json';
+import goodSign from '../../assets/signs/good.json';
+import morningSign from '../../assets/signs/morning.json';
+import noonSign from '../../assets/signs/noon.json';
+import afternoonSign from '../../assets/signs/afternoon.json';
+import eveningSign from '../../assets/signs/evening.json';
+import nightSign from '../../assets/signs/night.json';
+import daySign from '../../assets/signs/day.json';
+import goodMorningSign from '../../assets/signs/good-morning.json';
+import goodAfternoonSign from '../../assets/signs/good-afternoon.json';
+import goodEveningSign from '../../assets/signs/good-evening.json';
+import goodDaySign from '../../assets/signs/good-day.json';
+import goodNightSign from '../../assets/signs/good-night.json';
 
-type SignSource = string | number;
-
-const SIGNS: Record<string, SignSource> = {
-  'hello': require('../../assets/signs/hello.gif'),
-  'thank': 'https://www.handspeak.com/word/t/tha/thank-you.gif',
-  'you': 'https://www.handspeak.com/word/y/you/you.gif',
-  'please': 'https://www.handspeak.com/word/p/ple/please.gif',
-  'help': 'https://www.handspeak.com/word/h/hel/help.gif',
-  'yes': 'https://www.handspeak.com/word/y/yes/yes.gif',
-  'no': 'https://www.handspeak.com/word/n/no/no.gif',
-  'water': 'https://www.handspeak.com/word/w/wat/water.gif',
-  'food': 'https://www.handspeak.com/word/f/foo/food.gif',
-  'good': 'https://www.handspeak.com/word/g/goo/good.gif',
+const SIGNS: Record<string, any> = {
+  'hello': helloSign,
+  'good': goodSign,
+  'morning': morningSign,
+  'noon': noonSign,
+  'afternoon': afternoonSign,
+  'evening': eveningSign,
+  'night': nightSign,
+  'day': daySign,
+  'good morning': goodMorningSign,
+  'good afternoon': goodAfternoonSign,
+  'good evening': goodEveningSign,
+  'good day': goodDaySign,
+  'good night': goodNightSign,
 };
 
 export default function App() {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [currentSignData, setCurrentSignData] = useState<any>(null);
+
   const [transcript, setTranscript] = useState('');
   const [listening, setListening] = useState(false);
   const [currentWord, setCurrentWord] = useState('');
@@ -57,6 +76,8 @@ export default function App() {
       console.log('Current word:', firstWord);
       console.log('Sign data:', SIGNS[firstWord]);
       setCurrentWord(firstWord);
+      setCurrentSignData(SIGNS[firstWord] || null);
+      setIsPlaying(!!SIGNS[firstWord]);
     }
   });
 
@@ -78,7 +99,7 @@ export default function App() {
       await ExpoSpeechRecognitionModule.start({
         lang: 'en-KE',
         interimResults: true,
-        continuous: false,
+        continuous: true,
       });
     } catch (error) {
       setListening(false);
@@ -108,6 +129,8 @@ export default function App() {
     console.log('Navigating to prev word:', word);
     console.log('Sign data:', SIGNS[word]);
     setCurrentWord(word);
+    setCurrentSignData(SIGNS[word] || null);
+    setIsPlaying(!!SIGNS[word]);
   };
 
   /**
@@ -120,6 +143,8 @@ export default function App() {
     console.log('Navigating to next word:', word);
     console.log('Sign data:', SIGNS[word]);
     setCurrentWord(word);
+    setCurrentSignData(SIGNS[word] || null);
+    setIsPlaying(!!SIGNS[word]);
   };
 
   const currentSign = SIGNS[currentWord];
@@ -128,23 +153,38 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>🤟 Sign</Text>
       <Text style={styles.subtitle}>KSL Interpreter</Text>
-
+      {/* Avatar Box */}
       <View style={styles.signBox}>
-        {currentSign ? (
-          <>
-            <Image
-              source={typeof currentSign === 'string' ? { uri: currentSign } : currentSign}
-              style={styles.signImage}
-              resizeMode="contain"
-            />
-            <Text style={styles.signWord}>{currentWord.toUpperCase()}</Text>
-          </>
-        ) : (
-          <Text style={styles.placeholder}>
-            {currentWord ? `No sign yet for "${currentWord}"` : 'Speak to see signs here'}
-          </Text>
+        <StickFigureAvatar
+          signData={currentSignData}
+          isPlaying={isPlaying}
+          speed={speed}
+        />
+        {!currentSignData && (
+          <Text style={styles.placeholder}>Speak to see signs here</Text>
         )}
       </View>
+
+      {/* Controls */}
+      {currentSignData && (
+        <View style={styles.controls}>
+          <TouchableOpacity
+            style={styles.controlBtn}
+            onPress={() => {
+              setIsPlaying(!isPlaying);
+            }}
+          >
+            <Text style={styles.controlText}>{isPlaying ? '⏸ Pause' : '▶ Play'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.controlBtn}
+            onPress={() => setSpeed(speed === 1 ? 0.5 : 1)}
+          >
+            <Text style={styles.controlText}>{speed === 1 ? '🐢 Slow' : '⚡ Normal'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {words.length > 1 && (
         <View style={styles.navRow}>
@@ -173,7 +213,12 @@ export default function App() {
             <TouchableOpacity
               key={i}
               style={[styles.wordChip, i === wordIndex && styles.wordChipActive]}
-              onPress={() => { setWordIndex(i); setCurrentWord(word); }}
+              onPress={() => {
+                setWordIndex(i);
+                setCurrentWord(word);
+                setCurrentSignData(SIGNS[word] || null);
+                setIsPlaying(!!SIGNS[word]);
+              }}
             >
               <Text style={styles.wordText}>{word}</Text>
             </TouchableOpacity>
@@ -216,4 +261,21 @@ const styles = StyleSheet.create({
   micActive: { backgroundColor: '#ff4757' },
   micText: { fontSize: 20, fontWeight: 'bold', color: '#0a0a0a' },
   hint: { color: '#555', fontSize: 13 },
+  controls: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  controlBtn: {
+    backgroundColor: '#1a1a2e',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#00f5a0',
+  },
+  controlText: {
+    color: '#00f5a0',
+    fontWeight: '600',
+  },
 });
