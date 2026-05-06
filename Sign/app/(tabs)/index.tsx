@@ -155,12 +155,13 @@ export default function App() {
       <Text style={styles.subtitle}>KSL Interpreter</Text>
       {/* Avatar Box */}
       <View style={styles.signBox}>
-        <StickFigureAvatar
-          signData={currentSignData}
-          isPlaying={isPlaying}
-          speed={speed}
-        />
-        {!currentSignData && (
+        {currentSignData ? (
+          <StickFigureAvatar
+            signData={currentSignData}
+            isPlaying={isPlaying}
+            speed={speed}
+          />
+        ) : (
           <Text style={styles.placeholder}>Speak to see signs here</Text>
         )}
       </View>
