@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Canvas, Circle, Line, Group, Paint } from '@shopify/react-native-skia';
-import { useSharedValue, withTiming, withRepeat } from 'react-native-reanimated';
+import { Canvas, Circle, Line } from '@shopify/react-native-skia';
 
 const CANVAS_WIDTH = 300;
 const CANVAS_HEIGHT = 400;
@@ -34,6 +33,7 @@ interface Props {
   signData: SignData | null;
   isPlaying: boolean;
   speed: number; // 0.5 = slow, 1 = normal, 2 = fast
+  onSignComplete?: () => void;
 }
 
 // MediaPipe body landmark indices
@@ -69,10 +69,11 @@ function scaleLandmark(l: Landmark, width: number, height: number) {
   };
 }
 
-export default function StickFigureAvatar({ signData, isPlaying, speed }: Props) {
+export default function StickFigureAvatar({ signData, isPlaying, speed, onSignComplete }: Props) {
   const frameIndex = useRef(0);
   const [currentFrame, setCurrentFrame] = React.useState<Frame | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const didCompleteRef = useRef(false);
 
   useEffect(() => {
     if (!signData || !isPlaying) {
@@ -81,15 +82,28 @@ export default function StickFigureAvatar({ signData, isPlaying, speed }: Props)
     }
 
     frameIndex.current = 0;
+    didCompleteRef.current = false;
     const fps = signData.fps * speed;
     const interval = 1000 / fps;
 
     intervalRef.current = setInterval(() => {
-      if (frameIndex.current >= signData.frames.length) {
-        frameIndex.current = 0; // loop
+      const framesCount = signData.frames.length;
+      if (framesCount === 0) return;
+
+      const idx = frameIndex.current;
+      setCurrentFrame(signData.frames[idx]);
+
+      const nextIdx = idx + 1;
+      if (nextIdx >= framesCount) {
+        if (!didCompleteRef.current) {
+          didCompleteRef.current = true;
+          onSignComplete?.();
+        }
+        frameIndex.current = 0; // loop from start, matching 3D behavior
+      } else {
+        frameIndex.current = nextIdx;
+        didCompleteRef.current = false;
       }
-      setCurrentFrame(signData.frames[frameIndex.current]);
-      frameIndex.current++;
     }, interval);
 
     return () => {

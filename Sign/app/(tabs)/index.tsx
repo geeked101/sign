@@ -155,11 +155,18 @@ export default function App() {
       <Text style={styles.subtitle}>KSL Interpreter</Text>
       {/* Avatar Box */}
       <View style={styles.signBox}>
-        {currentSignData ? (
+        {currentWord ? (
           <StickFigureAvatar
             signData={currentSignData}
             isPlaying={isPlaying}
             speed={speed}
+            onSignComplete={() => {
+              if (wordIndex < words.length - 1) {
+                showNextWord();
+              } else {
+                setIsPlaying(false);
+              }
+            }}
           />
         ) : (
           <Text style={styles.placeholder}>Speak to see signs here</Text>
@@ -210,20 +217,37 @@ export default function App() {
 
       {words.length > 0 && (
         <View style={styles.wordsRow}>
-          {words.map((word, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[styles.wordChip, i === wordIndex && styles.wordChipActive]}
-              onPress={() => {
-                setWordIndex(i);
-                setCurrentWord(word);
-                setCurrentSignData(SIGNS[word] || null);
-                setIsPlaying(!!SIGNS[word]);
-              }}
-            >
-              <Text style={styles.wordText}>{word}</Text>
-            </TouchableOpacity>
-          ))}
+          {words.map((word, i) => {
+            const isRecognized = !!SIGNS[word.toLowerCase()];
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[
+                  styles.wordChip, 
+                  i === wordIndex && styles.wordChipActive,
+                  !isRecognized && styles.wordChipUnknown
+                ]}
+                onPress={() => {
+                  setWordIndex(i);
+                  setCurrentWord(word);
+                  setCurrentSignData(SIGNS[word.toLowerCase()] || null);
+                  setIsPlaying(!!SIGNS[word.toLowerCase()]);
+                }}
+              >
+                <Text style={[styles.wordText, !isRecognized && styles.wordTextUnknown]}>
+                  {word}{!isRecognized ? ' ❓' : ''}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {currentWord !== '' && !SIGNS[currentWord.toLowerCase()] && (
+        <View style={styles.unknownBox}>
+          <Text style={styles.unknownText}>
+            I haven't learned "{currentWord}" yet. 
+          </Text>
         </View>
       )}
 
@@ -257,7 +281,11 @@ const styles = StyleSheet.create({
   wordsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 20 },
   wordChip: { backgroundColor: '#16213e', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#333' },
   wordChipActive: { borderColor: '#00f5a0', backgroundColor: '#0a2a1a' },
+  wordChipUnknown: { borderColor: '#ff4757', backgroundColor: '#2a0a0a' },
   wordText: { color: '#aaa', fontSize: 13 },
+  wordTextUnknown: { color: '#ff4757' },
+  unknownBox: { backgroundColor: '#2a0a0a', padding: 10, borderRadius: 10, marginBottom: 12, borderWidth: 1, borderColor: '#ff4757' },
+  unknownText: { color: '#ff4757', fontSize: 12, fontWeight: '600' },
   micButton: { backgroundColor: '#00f5a0', paddingVertical: 20, paddingHorizontal: 50, borderRadius: 50, marginBottom: 12 },
   micActive: { backgroundColor: '#ff4757' },
   micText: { fontSize: 20, fontWeight: 'bold', color: '#0a0a0a' },
