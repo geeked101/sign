@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, SafeAreaView, ScrollView
+  StyleSheet, SafeAreaView, ScrollView, TextInput
 } from 'react-native';
 import { Image } from 'expo-image';
 import {
@@ -39,16 +39,69 @@ const SIGNS: Record<string, any> = {
   'good night': goodNightSign,
 };
 
+type PlaybackUnit = {
+  text: string;
+  signData: any | null;
+  isKnown: boolean;
+};
+
+function normalizeText(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, ' ') // drop punctuation, keep letters/numbers across locales
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildPlaybackUnits(inputText: string, signs: Record<string, any>): PlaybackUnit[] {
+  const clean = normalizeText(inputText);
+  if (!clean) return [];
+
+  const tokens = clean.split(' ').filter(Boolean);
+  const phraseTokenLists = Object.keys(signs).map((k) => k.split(' '));
+  const maxLen = phraseTokenLists.reduce((m, p) => Math.max(m, p.length), 1);
+
+  const units: PlaybackUnit[] = [];
+  let i = 0;
+  while (i < tokens.length) {
+    let matchedKey: string | null = null;
+    let matchedLen = 0;
+
+    for (let len = Math.min(maxLen, tokens.length - i); len >= 1; len--) {
+      const key = tokens.slice(i, i + len).join(' ');
+      if (signs[key]) {
+        matchedKey = key;
+        matchedLen = len;
+        break;
+      }
+    }
+
+    if (matchedKey) {
+      units.push({ text: matchedKey, signData: signs[matchedKey], isKnown: true });
+      i += matchedLen;
+    } else {
+      const unknown = tokens[i];
+      units.push({ text: unknown, signData: null, isKnown: false });
+      i += 1;
+    }
+  }
+
+  return units;
+}
+
 export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [currentSignData, setCurrentSignData] = useState<any>(null);
 
   const [transcript, setTranscript] = useState('');
   const [listening, setListening] = useState(false);
-  const [currentWord, setCurrentWord] = useState('');
-  const [words, setWords] = useState<string[]>([]);
-  const [wordIndex, setWordIndex] = useState(0);
+  const [typedText, setTypedText] = useState('');
+
+  const [units, setUnits] = useState<PlaybackUnit[]>([]);
+  const [unitIndex, setUnitIndex] = useState(0);
+
+  const currentUnit = units[unitIndex] || null;
+  const currentSignData = currentUnit?.signData ?? null;
 
   /**
    * Request necessary permissions for speech recognition on component mount.
@@ -64,21 +117,18 @@ export default function App() {
     getPermissions();
   }, []);
 
+  const applyInputText = (text: string) => {
+    setTranscript(text);
+    const nextUnits = buildPlaybackUnits(text, SIGNS);
+    setUnits(nextUnits);
+    setUnitIndex(0);
+    setIsPlaying(nextUnits.length > 0 && !!nextUnits[0]?.signData);
+  };
+
   useSpeechRecognitionEvent('result', (event) => {
     const text = event.results[0]?.transcript || '';
     console.log('Transcript received:', text);
-    setTranscript(text);
-    const split = text.toLowerCase().trim().split(' ').filter(Boolean);
-    setWords(split);
-    setWordIndex(0);
-    if (split.length > 0) {
-      const firstWord = split[0];
-      console.log('Current word:', firstWord);
-      console.log('Sign data:', SIGNS[firstWord]);
-      setCurrentWord(firstWord);
-      setCurrentSignData(SIGNS[firstWord] || null);
-      setIsPlaying(!!SIGNS[firstWord]);
-    }
+    applyInputText(text);
   });
 
   useSpeechRecognitionEvent('end', () => {
@@ -91,10 +141,7 @@ export default function App() {
    */
   const startListening = async () => {
     try {
-      setTranscript('');
-      setWords([]);
-      setCurrentWord('');
-      setWordIndex(0);
+      applyInputText('');
       setListening(true);
       await ExpoSpeechRecognitionModule.start({
         lang: 'en-KE',
@@ -120,49 +167,62 @@ export default function App() {
   };
 
   /**
-   * Displays the previous word in the transcript.
+   * Displays the previous unit (phrase/word) in the transcript.
    */
-  const showPrevWord = () => {
-    const newIndex = Math.max(0, wordIndex - 1);
-    setWordIndex(newIndex);
-    const word = words[newIndex];
-    console.log('Navigating to prev word:', word);
-    console.log('Sign data:', SIGNS[word]);
-    setCurrentWord(word);
-    setCurrentSignData(SIGNS[word] || null);
-    setIsPlaying(!!SIGNS[word]);
+  const showPrevUnit = () => {
+    const newIndex = Math.max(0, unitIndex - 1);
+    setUnitIndex(newIndex);
+    const u = units[newIndex];
+    console.log('Navigating to prev unit:', u?.text);
+    setIsPlaying(!!u?.signData);
   };
 
   /**
-   * Displays the next word in the transcript.
+   * Displays the next unit (phrase/word) in the transcript.
    */
-  const showNextWord = () => {
-    const newIndex = Math.min(words.length - 1, wordIndex + 1);
-    setWordIndex(newIndex);
-    const word = words[newIndex];
-    console.log('Navigating to next word:', word);
-    console.log('Sign data:', SIGNS[word]);
-    setCurrentWord(word);
-    setCurrentSignData(SIGNS[word] || null);
-    setIsPlaying(!!SIGNS[word]);
+  const showNextUnit = () => {
+    const newIndex = Math.min(units.length - 1, unitIndex + 1);
+    setUnitIndex(newIndex);
+    const u = units[newIndex];
+    console.log('Navigating to next unit:', u?.text);
+    setIsPlaying(!!u?.signData);
   };
-
-  const currentSign = SIGNS[currentWord];
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>🤟 Sign</Text>
       <Text style={styles.subtitle}>KSL Interpreter</Text>
+
+      <View style={styles.inputRow}>
+        <TextInput
+          value={typedText}
+          onChangeText={setTypedText}
+          placeholder="Type a sentence… (e.g. good morning)"
+          placeholderTextColor="#666"
+          style={styles.textInput}
+          autoCapitalize="none"
+          autoCorrect={false}
+          onSubmitEditing={() => applyInputText(typedText)}
+          returnKeyType="done"
+        />
+        <TouchableOpacity
+          style={styles.typeBtn}
+          onPress={() => applyInputText(typedText)}
+        >
+          <Text style={styles.typeBtnText}>Interpret</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Avatar Box */}
       <View style={styles.signBox}>
-        {currentWord ? (
+        {currentUnit ? (
           <StickFigureAvatar
             signData={currentSignData}
             isPlaying={isPlaying}
             speed={speed}
             onSignComplete={() => {
-              if (wordIndex < words.length - 1) {
-                showNextWord();
+              if (unitIndex < units.length - 1) {
+                showNextUnit();
               } else {
                 setIsPlaying(false);
               }
@@ -194,20 +254,20 @@ export default function App() {
         </View>
       )}
 
-      {words.length > 1 && (
+      {units.length > 1 && (
         <View style={styles.navRow}>
-          <TouchableOpacity style={styles.navBtn} onPress={showPrevWord} disabled={wordIndex === 0}>
+          <TouchableOpacity style={styles.navBtn} onPress={showPrevUnit} disabled={unitIndex === 0}>
             <Text style={styles.navText}>Prev</Text>
           </TouchableOpacity>
-          <Text style={styles.wordCount}>{wordIndex + 1} / {words.length}</Text>
-          <TouchableOpacity style={styles.navBtn} onPress={showNextWord} disabled={wordIndex === words.length - 1}>
+          <Text style={styles.wordCount}>{unitIndex + 1} / {units.length}</Text>
+          <TouchableOpacity style={styles.navBtn} onPress={showNextUnit} disabled={unitIndex === units.length - 1}>
             <Text style={styles.navText}>Next</Text>
           </TouchableOpacity>
         </View>
       )}
 
       <View style={styles.transcriptBox}>
-        <Text style={styles.label}>You said:</Text>
+        <Text style={styles.label}>Input:</Text>
         <ScrollView>
           <Text style={styles.transcriptText}>
             {transcript || 'Tap the mic and speak...'}
@@ -215,27 +275,25 @@ export default function App() {
         </ScrollView>
       </View>
 
-      {words.length > 0 && (
+      {units.length > 0 && (
         <View style={styles.wordsRow}>
-          {words.map((word, i) => {
-            const isRecognized = !!SIGNS[word.toLowerCase()];
+          {units.map((u, i) => {
+            const isRecognized = u.isKnown;
             return (
               <TouchableOpacity
                 key={i}
                 style={[
                   styles.wordChip, 
-                  i === wordIndex && styles.wordChipActive,
+                  i === unitIndex && styles.wordChipActive,
                   !isRecognized && styles.wordChipUnknown
                 ]}
                 onPress={() => {
-                  setWordIndex(i);
-                  setCurrentWord(word);
-                  setCurrentSignData(SIGNS[word.toLowerCase()] || null);
-                  setIsPlaying(!!SIGNS[word.toLowerCase()]);
+                  setUnitIndex(i);
+                  setIsPlaying(!!u.signData);
                 }}
               >
                 <Text style={[styles.wordText, !isRecognized && styles.wordTextUnknown]}>
-                  {word}{!isRecognized ? ' ❓' : ''}
+                  {u.text}{!isRecognized ? ' ❓' : ''}
                 </Text>
               </TouchableOpacity>
             );
@@ -243,10 +301,10 @@ export default function App() {
         </View>
       )}
 
-      {currentWord !== '' && !SIGNS[currentWord.toLowerCase()] && (
+      {currentUnit?.text && !currentUnit.isKnown && (
         <View style={styles.unknownBox}>
           <Text style={styles.unknownText}>
-            I haven't learned "{currentWord}" yet. 
+            I haven't learned "{currentUnit.text}" yet. 
           </Text>
         </View>
       )}
@@ -278,6 +336,10 @@ const styles = StyleSheet.create({
   transcriptBox: { width: '100%', maxHeight: 80, backgroundColor: '#111', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#222' },
   label: { color: '#00f5a0', fontSize: 10, marginBottom: 4, letterSpacing: 1 },
   transcriptText: { color: '#ccc', fontSize: 15 },
+  inputRow: { width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 12 },
+  textInput: { flex: 1, backgroundColor: '#111', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#eee', borderWidth: 1, borderColor: '#222' },
+  typeBtn: { backgroundColor: '#1a1a2e', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#00f5a0' },
+  typeBtnText: { color: '#00f5a0', fontWeight: '700' },
   wordsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 20 },
   wordChip: { backgroundColor: '#16213e', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#333' },
   wordChipActive: { borderColor: '#00f5a0', backgroundColor: '#0a2a1a' },
