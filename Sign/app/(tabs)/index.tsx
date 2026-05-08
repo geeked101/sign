@@ -9,89 +9,12 @@ import {
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
 import StickFigureAvatar from '../../components/StickFigureAvatar';
-import helloSign from '../../assets/signs/hello.json';
-import goodSign from '../../assets/signs/good.json';
-import morningSign from '../../assets/signs/morning.json';
-import noonSign from '../../assets/signs/noon.json';
-import afternoonSign from '../../assets/signs/afternoon.json';
-import eveningSign from '../../assets/signs/evening.json';
-import nightSign from '../../assets/signs/night.json';
-import daySign from '../../assets/signs/day.json';
-import goodMorningSign from '../../assets/signs/good-morning.json';
-import goodAfternoonSign from '../../assets/signs/good-afternoon.json';
-import goodEveningSign from '../../assets/signs/good-evening.json';
-import goodDaySign from '../../assets/signs/good-day.json';
-import goodNightSign from '../../assets/signs/good-night.json';
-
-const SIGNS: Record<string, any> = {
-  'hello': helloSign,
-  'good': goodSign,
-  'morning': morningSign,
-  'noon': noonSign,
-  'afternoon': afternoonSign,
-  'evening': eveningSign,
-  'night': nightSign,
-  'day': daySign,
-  'good morning': goodMorningSign,
-  'good afternoon': goodAfternoonSign,
-  'good evening': goodEveningSign,
-  'good day': goodDaySign,
-  'good night': goodNightSign,
-};
-
-type PlaybackUnit = {
-  text: string;
-  signData: any | null;
-  isKnown: boolean;
-};
-
-function normalizeText(text: string) {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]+/gu, ' ') // drop punctuation, keep letters/numbers across locales
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function buildPlaybackUnits(inputText: string, signs: Record<string, any>): PlaybackUnit[] {
-  const clean = normalizeText(inputText);
-  if (!clean) return [];
-
-  const tokens = clean.split(' ').filter(Boolean);
-  const phraseTokenLists = Object.keys(signs).map((k) => k.split(' '));
-  const maxLen = phraseTokenLists.reduce((m, p) => Math.max(m, p.length), 1);
-
-  const units: PlaybackUnit[] = [];
-  let i = 0;
-  while (i < tokens.length) {
-    let matchedKey: string | null = null;
-    let matchedLen = 0;
-
-    for (let len = Math.min(maxLen, tokens.length - i); len >= 1; len--) {
-      const key = tokens.slice(i, i + len).join(' ');
-      if (signs[key]) {
-        matchedKey = key;
-        matchedLen = len;
-        break;
-      }
-    }
-
-    if (matchedKey) {
-      units.push({ text: matchedKey, signData: signs[matchedKey], isKnown: true });
-      i += matchedLen;
-    } else {
-      const unknown = tokens[i];
-      units.push({ text: unknown, signData: null, isKnown: false });
-      i += 1;
-    }
-  }
-
-  return units;
-}
+import { buildPlaybackUnits, firstKnownIndex, SIGNS, type PlaybackUnit } from '../../lib/signs';
 
 export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+  const [skipUnknown, setSkipUnknown] = useState(true);
 
   const [transcript, setTranscript] = useState('');
   const [listening, setListening] = useState(false);
@@ -121,9 +44,27 @@ export default function App() {
     setTranscript(text);
     const nextUnits = buildPlaybackUnits(text, SIGNS);
     setUnits(nextUnits);
-    setUnitIndex(0);
-    setIsPlaying(nextUnits.length > 0 && !!nextUnits[0]?.signData);
+    const firstKnown = skipUnknown ? firstKnownIndex(nextUnits, 0) : 0;
+    const nextIndex = firstKnown === -1 ? 0 : firstKnown;
+    setUnitIndex(nextIndex);
+    setIsPlaying(nextUnits.length > 0 && !!nextUnits[nextIndex]?.signData);
   };
+
+  useEffect(() => {
+    if (!skipUnknown) return;
+    if (units.length === 0) return;
+    if (unitIndex >= units.length) return;
+    if (units[unitIndex]?.isKnown) return;
+
+    const nextKnown = firstKnownIndex(units, unitIndex + 1);
+    if (nextKnown === -1) {
+      setIsPlaying(false);
+      return;
+    }
+
+    setUnitIndex(nextKnown);
+    setIsPlaying(!!units[nextKnown]?.signData);
+  }, [skipUnknown, units, unitIndex]);
 
   useSpeechRecognitionEvent('result', (event) => {
     const text = event.results[0]?.transcript || '';
@@ -213,6 +154,17 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.settingsRow}>
+        <TouchableOpacity
+          style={[styles.toggleBtn, skipUnknown && styles.toggleBtnActive]}
+          onPress={() => setSkipUnknown(!skipUnknown)}
+        >
+          <Text style={styles.toggleText}>
+            {skipUnknown ? 'Skip unknown: ON' : 'Skip unknown: OFF'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Avatar Box */}
       <View style={styles.signBox}>
         {currentUnit ? (
@@ -222,6 +174,16 @@ export default function App() {
             speed={speed}
             onSignComplete={() => {
               if (unitIndex < units.length - 1) {
+                if (skipUnknown) {
+                  const nextKnown = firstKnownIndex(units, unitIndex + 1);
+                  if (nextKnown === -1) {
+                    setIsPlaying(false);
+                    return;
+                  }
+                  setUnitIndex(nextKnown);
+                  setIsPlaying(!!units[nextKnown]?.signData);
+                  return;
+                }
                 showNextUnit();
               } else {
                 setIsPlaying(false);
@@ -340,6 +302,10 @@ const styles = StyleSheet.create({
   textInput: { flex: 1, backgroundColor: '#111', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#eee', borderWidth: 1, borderColor: '#222' },
   typeBtn: { backgroundColor: '#1a1a2e', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#00f5a0' },
   typeBtnText: { color: '#00f5a0', fontWeight: '700' },
+  settingsRow: { width: '100%', flexDirection: 'row', justifyContent: 'flex-start', marginBottom: 12 },
+  toggleBtn: { backgroundColor: '#111', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#222' },
+  toggleBtnActive: { borderColor: '#00f5a0', backgroundColor: '#0a2a1a' },
+  toggleText: { color: '#00f5a0', fontWeight: '700', fontSize: 12 },
   wordsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 20 },
   wordChip: { backgroundColor: '#16213e', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#333' },
   wordChipActive: { borderColor: '#00f5a0', backgroundColor: '#0a2a1a' },
