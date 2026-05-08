@@ -1,7 +1,7 @@
 # Sign — KSL Interpreter App
 
 ## Project Overview
-A React Native (Expo) Android app that listens to speech, converts it to text, and displays the corresponding sign language animation/GIF for each word. Built specifically for the developer's deaf sister using Kenyan Sign Language (KSL) as the target.
+A React Native (Expo) Android app that listens to speech, converts it to text, and displays the corresponding sign language animation/GIF for each word.
 
 ## Tech Stack
 - **Framework:** React Native with Expo Router (file-based routing)
@@ -31,7 +31,7 @@ A React Native (Expo) Android app that listens to speech, converts it to text, a
 - **OTA Updates**: Uses `eas update` for JS-level changes to avoid frequent full rebuilds.
 
 ## Roadmap
-- [ ] Add sister's full phrase/word list to SIGNS dictionary.
+- [ ] Add  full phrase/word list to SIGNS dictionary.
 - [ ] Source or record GIFs for each word/phrase.
 - [ ] Implement Lottie animated avatar (Phase 2).
 - [ ] Speed control + repeat button.
