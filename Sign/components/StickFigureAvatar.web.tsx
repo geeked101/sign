@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import StickFigureAvatar3D from './StickFigureAvatar3D';
+import ModelAvatar3D from './ModelAvatar3D';
 
 type AvatarRenderer = '2d' | '3d' | 'auto';
 
@@ -58,7 +58,7 @@ export default function StickFigureAvatar(props: AvatarProps) {
     if (!isMounted) return;
     setReady3D(false);
     setUse3D(true);
-  }, [isMounted, signData]);
+  }, [isMounted]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -71,13 +71,18 @@ export default function StickFigureAvatar(props: AvatarProps) {
     return <Text style={{ color: '#00f5a0' }}>Loading 3D Scene...</Text>;
   }
 
-  if (!use3D) {
-    return (
-      <Text style={{ color: '#ff4757' }}>
-        3D renderer failed to initialize on web.
-      </Text>
-    );
-  }
+  // 2D fallback commented out — Skia doesn't work on web anyway
+  // if (!use3D) {
+  //   return (
+  //     <Text style={{ color: '#ff4757' }}>
+  //       3D renderer failed to initialize on web.
+  //     </Text>
+  //   );
+  // }
+
+  const handleReady3D = React.useCallback(() => {
+    setReady3D(true);
+  }, []);
 
   return (
     <View style={{ flex: 1, width: '100%', height: '100%' }}>
@@ -92,12 +97,12 @@ export default function StickFigureAvatar(props: AvatarProps) {
         </Text>
       )}
       <AvatarErrorBoundary onError={() => setUse3D(false)}>
-        <StickFigureAvatar3D
+        <ModelAvatar3D
           signData={signData}
           isPlaying={isPlaying}
           speed={speed}
           onSignComplete={onSignComplete}
-          onReady={() => setReady3D(true)}
+          onReady={handleReady3D}
         />
       </AvatarErrorBoundary>
     </View>

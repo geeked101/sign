@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import StickFigureAvatar2D from './StickFigureAvatarCore';
-import StickFigureAvatar3D from './StickFigureAvatar3D';
+import ModelAvatar3D from './ModelAvatar3D.native';
 
 type AvatarRenderer = '2d' | '3d' | 'auto';
 
@@ -38,7 +38,7 @@ function getConfiguredRenderer(rendererProp?: AvatarRenderer): AvatarRenderer {
   const envRenderer: AvatarRenderer | undefined =
     env === '2d' || env === '3d' || env === 'auto' ? (env as AvatarRenderer) : undefined;
 
-  return rendererProp ?? envRenderer ?? '2d';
+  return rendererProp ?? envRenderer ?? '3d';
 }
 
 export default function StickFigureAvatar(props: AvatarProps) {
@@ -62,29 +62,38 @@ export default function StickFigureAvatar(props: AvatarProps) {
     return () => clearTimeout(t);
   }, [use3D, ready3D, errored3D]);
 
-  if (!use3D) {
-    return <StickFigureAvatar2D signData={signData} isPlaying={isPlaying} speed={speed} onSignComplete={onSignComplete} />;
-  }
+  // 2D fallback commented out — use Skia StickFigureAvatar2D here if needed
+  // if (!use3D) {
+  //   return <StickFigureAvatar2D signData={signData} isPlaying={isPlaying} speed={speed} onSignComplete={onSignComplete} />;
+  // }
 
   return (
     <View style={{ flex: 1, width: '100%', height: '100%' }}>
       {!ready3D && !errored3D && (
         <Text style={{ color: '#00f5a0', padding: 8, fontSize: 12 }}>
-          Initializing 3D… (falling back to 2D if needed)
+          Initializing 3D…
+        </Text>
+      )}
+      {errored3D && (
+        <Text style={{ color: '#ff4757', padding: 8, fontSize: 12 }}>
+          [ERROR] 3D avatar failed to initialize — see console for details
         </Text>
       )}
       <AvatarErrorBoundary
-        onError={() => {
+        onError={(err) => {
+          console.error('[StickFigureAvatar] 3D renderer error:', err);
           setErrored3D(true);
-          setUse3D(false);
+          // Keep use3D true so we show the error message instead of blank space
+          // setUse3D(false);
         }}
       >
-        <StickFigureAvatar3D
+        <ModelAvatar3D
           signData={signData}
           isPlaying={isPlaying}
           speed={speed}
           onSignComplete={onSignComplete}
           onReady={() => {
+            console.log('[StickFigureAvatar] 3D model avatar ready');
             setReady3D(true);
           }}
         />

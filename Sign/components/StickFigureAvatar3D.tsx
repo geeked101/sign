@@ -55,16 +55,20 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
     v.set((l.x - 0.5) * 4, (0.5 - l.y) * 4, -l.z * 4);
   };
 
-  // State for Chaining and Blending
+  // Transition/Blending State
   const progressRef = useRef(0);
   const lastSignRef = useRef<SignData | null>(null);
   
-  // Transition/Blending State
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  // Transition/Blending Ref (avoid React re-render)
+  const isTransitioningRef = useRef(false);
   const transitionProgressRef = useRef(0);
   const lastPoseRef = useRef<Frame | null>(null);
 
   useFrame((state, delta) => {
+    if (!groupRef.current) {
+      console.warn('[StickFigureAvatar3D] groupRef not initialized');
+      return;
+    }
     // ACCOUNTABILITY: If we are 'playing' but have no data, perform a 'shrug' animation
     if (isPlaying && (!signData || !signData.frames || signData.frames.length === 0)) {
       const time = state.clock.elapsedTime;
@@ -87,11 +91,15 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
       const lHandLine = leftHandLinesRefs.current[0];
       const rHandLine = rightHandLinesRefs.current[0];
       if (lHandLine) {
-        lHandLine.setPoints([new THREE.Vector3(-0.5, 0.5, 0.5), new THREE.Vector3(-0.8, 0.7 + handRaise, 0.8)]);
+        v1.set(-0.5, 0.5, 0.5);
+        v2.set(-0.8, 0.7 + handRaise, 0.8);
+        lHandLine.setPoints([v1, v2]);
         lHandLine.visible = true;
       }
       if (rHandLine) {
-        rHandLine.setPoints([new THREE.Vector3(0.5, 0.5, 0.5), new THREE.Vector3(0.8, 0.7 + handRaise, 0.8)]);
+        v1.set(0.5, 0.5, 0.5);
+        v2.set(0.8, 0.7 + handRaise, 0.8);
+        rHandLine.setPoints([v1, v2]);
         rHandLine.visible = true;
       }
       return;
@@ -102,7 +110,7 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
     // Detect Sign Change -> Start Transition
     if (lastSignRef.current !== signData) {
       if (lastSignRef.current !== null) {
-        setIsTransitioning(true);
+        isTransitioningRef.current = true;
         transitionProgressRef.current = 0;
       }
       progressRef.current = 0;
@@ -113,11 +121,11 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
     let nextFrame: Frame;
     let alpha: number;
 
-    if (isTransitioning) {
+    if (isTransitioningRef.current) {
       // We are "Blending" from the last known pose to the first frame of the new sign
       transitionProgressRef.current += delta * 3; // 333ms transition
       if (transitionProgressRef.current >= 1) {
-        setIsTransitioning(false);
+        isTransitioningRef.current = false;
       }
       
       currentFrame = lastPoseRef.current || signData.frames[0];
@@ -164,7 +172,10 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
         setVec(v2, n2);
         vTmp2.lerpVectors(v1, v2, alpha);
 
-        lineRef.setPoints([vTmp1.clone(), vTmp2.clone()]);
+        const geom = lineRef.geometry ?? lineRef;
+        if (geom && typeof geom.setPositions === 'function') {
+          geom.setPositions([vTmp1.x, vTmp1.y, vTmp1.z, vTmp2.x, vTmp2.y, vTmp2.z]);
+        }
         lineRef.visible = true;
       } else {
         lineRef.visible = false;
