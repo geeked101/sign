@@ -72,42 +72,52 @@ function scaleLandmark(l: Landmark, width: number, height: number) {
 export default function StickFigureAvatar({ signData, isPlaying, speed, onSignComplete }: Props) {
   const frameIndex = useRef(0);
   const [currentFrame, setCurrentFrame] = React.useState<Frame | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const didCompleteRef = useRef(false);
 
   useEffect(() => {
     if (!signData || !isPlaying) {
-      if (intervalRef.current) clearInterval(intervalRef.current);
       return;
     }
 
     frameIndex.current = 0;
     didCompleteRef.current = false;
+    let lastTimestamp = 0;
+    let animationFrameId: number;
+
     const fps = signData.fps * speed;
-    const interval = 1000 / fps;
+    const frameDuration = 1000 / fps;
 
-    intervalRef.current = setInterval(() => {
-      const framesCount = signData.frames.length;
-      if (framesCount === 0) return;
+    const animate = (timestamp: number) => {
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const elapsed = timestamp - lastTimestamp;
 
-      const idx = frameIndex.current;
-      setCurrentFrame(signData.frames[idx]);
+      if (elapsed >= frameDuration) {
+        const framesCount = signData.frames.length;
+        if (framesCount > 0) {
+          const idx = frameIndex.current;
+          setCurrentFrame(signData.frames[idx]);
 
-      const nextIdx = idx + 1;
-      if (nextIdx >= framesCount) {
-        if (!didCompleteRef.current) {
-          didCompleteRef.current = true;
-          onSignComplete?.();
+          const nextIdx = idx + 1;
+          if (nextIdx >= framesCount) {
+            if (!didCompleteRef.current) {
+              didCompleteRef.current = true;
+              onSignComplete?.();
+            }
+            frameIndex.current = 0;
+          } else {
+            frameIndex.current = nextIdx;
+            didCompleteRef.current = false;
+          }
         }
-        frameIndex.current = 0; // loop from start, matching 3D behavior
-      } else {
-        frameIndex.current = nextIdx;
-        didCompleteRef.current = false;
+        lastTimestamp = timestamp - (elapsed % frameDuration);
       }
-    }, interval);
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      cancelAnimationFrame(animationFrameId);
     };
   }, [signData, isPlaying, speed]);
 

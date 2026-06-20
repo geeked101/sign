@@ -36,6 +36,8 @@ From `app/(tabs)/index.tsx` and `AVAILABLE_SIGNS.md`:
 - **Playback navigation**
   - Prev/Next navigation through phrase/word units.
   - Tappable chips; unknown units are visually marked.
+- **Skip unknown mode**
+  - Toggle to automatically skip unknown units during sentence playback so interpretation can continue.
 - **Avatar sign playback**
   - Default renderer on native is **Skia 2D** (stable startup).
   - 3D renderer exists (Three/R3F) as an opt-in path with fallback.
@@ -61,6 +63,8 @@ From `app/(tabs)/index.tsx` and `AVAILABLE_SIGNS.md`:
 - `assets/`
   - `assets/signs/*.json`: sign frame datasets used by the avatar player.
   - `assets/images/*`: icon/splash/favicons.
+- `lib/`
+  - `lib/signs.ts`: central `SIGNS` registry + phrase parsing utilities (used by UI).
 - `constants/`, `hooks/`: small app utilities (theme + color scheme).
 - `scripts/`: project helper scripts (e.g., reset).
 - `dist/`, `public/`: build artifacts / web assets (not primary dev surface).

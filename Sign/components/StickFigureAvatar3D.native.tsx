@@ -59,11 +59,16 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
   const progressRef = useRef(0);
   const lastSignRef = useRef<SignData | null>(null);
   
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  // Transition/Blending Ref (avoid React re-render)
+  const isTransitioningRef = useRef(false);
   const transitionProgressRef = useRef(0);
   const lastPoseRef = useRef<Frame | null>(null);
 
   useFrame((state, delta) => {
+    if (!groupRef.current) {
+      console.warn('[StickFigureAvatar3D.native] groupRef not initialized');
+      return;
+    }
     // ACCOUNTABILITY: If we are 'playing' but have no data, perform a 'shrug' animation
     if (isPlaying && (!signData || !signData.frames || signData.frames.length === 0)) {
       const time = state.clock.elapsedTime;
@@ -84,11 +89,15 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
       const lHandLine = leftHandLinesRefs.current[0];
       const rHandLine = rightHandLinesRefs.current[0];
       if (lHandLine) {
-        lHandLine.setPoints([new THREE.Vector3(-0.5, 0.5, 0.5), new THREE.Vector3(-0.8, 0.7 + handRaise, 0.8)]);
+        v1.set(-0.5, 0.5, 0.5);
+        v2.set(-0.8, 0.7 + handRaise, 0.8);
+        lHandLine.setPoints([v1, v2]);
         lHandLine.visible = true;
       }
       if (rHandLine) {
-        rHandLine.setPoints([new THREE.Vector3(0.5, 0.5, 0.5), new THREE.Vector3(0.8, 0.7 + handRaise, 0.8)]);
+        v1.set(0.5, 0.5, 0.5);
+        v2.set(0.8, 0.7 + handRaise, 0.8);
+        rHandLine.setPoints([v1, v2]);
         rHandLine.visible = true;
       }
       return;
@@ -98,7 +107,7 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
 
     if (lastSignRef.current !== signData) {
       if (lastSignRef.current !== null) {
-        setIsTransitioning(true);
+        isTransitioningRef.current = true;
         transitionProgressRef.current = 0;
       }
       progressRef.current = 0;
@@ -109,10 +118,10 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
     let nextFrame: Frame;
     let alpha: number;
 
-    if (isTransitioning) {
+    if (isTransitioningRef.current) {
       transitionProgressRef.current += delta * 3;
       if (transitionProgressRef.current >= 1) {
-        setIsTransitioning(false);
+        isTransitioningRef.current = false;
       }
       
       currentFrame = lastPoseRef.current || signData.frames[0];
@@ -157,7 +166,10 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
         setVec(v2, n2);
         vTmp2.lerpVectors(v1, v2, alpha);
 
-        lineRef.setPoints([vTmp1.clone(), vTmp2.clone()]);
+        const geom = lineRef.geometry ?? lineRef;
+        if (geom && typeof geom.setPositions === 'function') {
+          geom.setPositions([vTmp1.x, vTmp1.y, vTmp1.z, vTmp2.x, vTmp2.y, vTmp2.z]);
+        }
         lineRef.visible = true;
       } else {
         lineRef.visible = false;
@@ -220,9 +232,13 @@ function ChibiPandaAvatar({ signData, isPlaying, speed, onSignComplete }: Props)
 export default function StickFigureAvatar3D(props: Props) {
   return (
     <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: '#0a0a0a' }}>
-      <Canvas 
+      <Canvas
+        style={{ width: '100%', height: '100%' }}
         camera={{ position: [0, 0, 5], fov: 45 }}
-        onCreated={() => props.onReady?.()}
+        onCreated={() => {
+          console.log('[StickFigureAvatar3D.native] Canvas created');
+          props.onReady?.();
+        }}
       >
         <ambientLight intensity={0.7} />
         <pointLight position={[10, 10, 10]} intensity={1} />
